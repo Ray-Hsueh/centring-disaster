@@ -14,6 +14,10 @@ class CentringDisaster {
         this.scoresList = document.getElementById('scoresList');
         this.confettiContainer = document.getElementById('confettiContainer');
         this.celebrationContainer = document.getElementById('celebrationContainer');
+        this.bestScoresPanel = document.getElementById('bestScores');
+        this.brandTextEl = document.querySelector('.brand-text');
+        this.scoresTitleEl = document.querySelector('.scores-title');
+        this.copyBtnEl = document.querySelector('.copy-btn');
         
         this.isDragging = false;
         this.startX = 0;
@@ -21,15 +25,69 @@ class CentringDisaster {
         this.currentLevel = 1;
         this.maxLevel = 8;
         this.bestScores = this.loadBestScores();
+        this.levelImages = {};
         
         this.init();
     }
     
-    init() {
+    async init() {
+        await this.loadLevelImages();
         this.setupEventListeners();
+        this.applyI18nStaticTexts();
         this.setupLevel();
         this.updateScoreDisplay();
         this.renderBestScores();
+        this.initializeButtonTexts();
+    }
+    
+    async loadLevelImages() {
+        const loadPromises = [];
+        
+        for (let level = 1; level <= this.maxLevel; level++) {
+            const loadPromise = new Promise((resolve) => {
+                const img = new Image();
+                img.src = `images/level${level}.png`;
+                
+                img.onload = () => {
+                    this.levelImages[level] = img;
+                    resolve();
+                };
+                
+                img.onerror = () => {
+                    img.src = `images/level${level}.gif`;
+                    img.onerror = () => {
+                        img.src = `images/level${level}.jpg`;
+                        img.onerror = () => {
+                            img.src = `images/level${level}.svg`;
+                            img.onerror = () => {
+
+                                this.levelImages[level] = null;
+                                resolve();
+                            };
+                        };
+                    };
+                };
+            });
+            
+            loadPromises.push(loadPromise);
+        }
+        
+
+        await Promise.all(loadPromises);
+    }
+    
+    initializeButtonTexts() {
+        this.replayBtn.textContent = i18n.t('replayLevel');
+        this.nextLevelBtn.textContent = i18n.t('nextLevel');
+        if (this.copyBtnEl) this.copyBtnEl.textContent = i18n.t('copy');
+    }
+    
+    applyI18nStaticTexts() {
+        if (this.brandTextEl) this.brandTextEl.textContent = i18n.t('brand');
+        if (this.scoresTitleEl) this.scoresTitleEl.textContent = i18n.t('bestScores');
+        if (typeof document !== 'undefined') {
+            document.title = i18n.t('title');
+        }
     }
     
     loadBestScores() {
@@ -132,6 +190,40 @@ class CentringDisaster {
         this.draggableObject.style.top = y + 'px';
     }
     
+    applyLevelImage() {
+        const img = this.levelImages[this.currentLevel];
+        if (img) {
+            
+            this.draggableObject.style.backgroundImage = `url(${img.src})`;
+            this.draggableObject.style.backgroundSize = 'contain';
+            this.draggableObject.style.backgroundRepeat = 'no-repeat';
+            this.draggableObject.style.backgroundPosition = 'center';
+            this.draggableObject.style.backgroundColor = 'transparent';
+            this.draggableObject.style.width = '100px';
+            this.draggableObject.style.height = '100px';
+            this.draggableObject.style.boxShadow = 'none';
+            this.draggableObject.style.border = 'none';
+            this.draggableObject.style.borderRadius = '0';
+        } else {
+            
+            this.draggableObject.style.backgroundImage = 'none';
+            this.draggableObject.style.backgroundColor = this.getDefaultColor();
+            this.draggableObject.style.width = this.getObjectSize() + 'px';
+            this.draggableObject.style.height = this.getObjectSize() + 'px';
+            this.draggableObject.style.boxShadow = '';
+            this.draggableObject.style.border = '';
+            this.draggableObject.style.borderRadius = '';
+        }
+    }
+    
+    getDefaultColor() {
+        const colors = {
+            1: '#66bb6a', 2: '#ff6b6b', 3: '#9b59b6', 4: '#f1c40f',
+            5: '#3498db', 6: '#e91e63', 7: '#00bcd4', 8: '#ff9800'
+        };
+        return colors[this.currentLevel] || '#66bb6a';
+    }
+    
     getObjectSize() {
         const sizes = { 
             1: 100, 2: 80, 3: 65, 4: 55, 5: 45, 
@@ -148,6 +240,7 @@ class CentringDisaster {
         const screenCenterX = windowWidth / 2;
         const screenCenterY = windowHeight / 2;
         
+  
         const objectCenterX = objectRect.left + objectRect.width / 2;
         const objectCenterY = objectRect.top + objectRect.height / 2;
         
@@ -283,7 +376,7 @@ class CentringDisaster {
             
             const levelNumber = document.createElement('div');
             levelNumber.className = 'level-number';
-            levelNumber.textContent = i18n.t('level', { level: level });
+            levelNumber.textContent = i18n.t('level', { level });
             
             const levelScore = document.createElement('div');
             levelScore.className = 'level-score';
@@ -320,7 +413,8 @@ class CentringDisaster {
     }
     
     setupLevel() {
-        this.draggableObject.className = `draggable-object level-${this.currentLevel}`;
+        this.draggableObject.className = 'draggable-object';
+        this.applyLevelImage();
         this.randomizeObjectPosition();
         this.renderBestScores();
     }
@@ -357,10 +451,7 @@ class CentringDisaster {
     }
     
     copyScore() {
-        const text = i18n.t('shareText', { 
-            score: this.successScore.textContent,
-            level: this.currentLevel
-        }) + '\n\nPlay at: https://centring-disaster.pages.dev';
+        const text = i18n.t('shareText', { score: this.successScore.textContent, level: this.currentLevel });
         
         navigator.clipboard.writeText(text).then(() => {
             alert(i18n.t('copied'));
@@ -387,26 +478,52 @@ class CentringDisaster {
         const centerX = windowWidth / 2;
         const centerY = windowHeight / 2;
         
-        let x, y;
-        do {
-            x = Math.random() * (windowWidth - objectSize);
-            y = Math.random() * (windowHeight - objectSize);
-        } while (
-            Math.abs(x - centerX + objectSize/2) < 150 && 
-            Math.abs(y - centerY + objectSize/2) < 150
-        );
-        
-        const safeZone = 250;
+        const safeZone = 100;
         const leftBound = safeZone;
         const rightBound = windowWidth - safeZone - objectSize;
         const topBound = safeZone;
         const bottomBound = windowHeight - safeZone - objectSize;
         
-        x = Math.max(leftBound, Math.min(x, rightBound));
-        y = Math.max(topBound, Math.min(y, bottomBound));
+        const forbiddenRects = this.getForbiddenRects();
+        
+        let x, y;
+        let attempts = 0;
+        do {
+            x = Math.random() * (rightBound - leftBound) + leftBound;
+            y = Math.random() * (bottomBound - topBound) + topBound;
+            attempts++;
+        } while (
+            (
+                (
+                    Math.abs(x - centerX + objectSize/2) < 200 && 
+                    Math.abs(y - centerY + objectSize/2) < 200
+                ) || this.overlapsForbidden(x, y, objectSize, forbiddenRects)
+            ) && attempts < 200
+        );
         
         this.draggableObject.style.left = x + 'px';
         this.draggableObject.style.top = y + 'px';
+    }
+    
+    getForbiddenRects() {
+        const rects = [];
+        const brand = document.querySelector('.brand');
+        const score = this.scoreDisplay;
+        const best = this.bestScoresPanel;
+        if (brand) rects.push(brand.getBoundingClientRect());
+        if (score) rects.push(score.getBoundingClientRect());
+        if (best) rects.push(best.getBoundingClientRect());
+        return rects;
+    }
+    
+    overlapsForbidden(x, y, size, rects) {
+        const margin = 12;
+        const obj = { left: x - margin, top: y - margin, right: x + size + margin, bottom: y + size + margin };
+        return rects.some(r => this.rectsIntersect(obj, r));
+    }
+    
+    rectsIntersect(a, b) {
+        return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
     }
 }
 
