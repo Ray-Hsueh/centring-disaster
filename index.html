@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centring Disaster</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="brand">
+            <span class="brand-text">CENTRING DISASTER</span>
+        </div>
+        
+        <div class="game-area">
+            <div class="draggable-object" id="draggableObject" draggable="true"></div>
+        </div>
+        
+        <div class="ui-left">
+            <div class="score-display" id="scoreDisplay">
+                <div class="score-text">Drag the object to the center of the screen</div>
+            </div>
+        </div>
+        
+        <div class="ui-right">
+            <div class="best-scores" id="bestScores">
+                <div class="scores-title">Best Scores</div>
+                <div class="scores-list" id="scoresList">
+                </div>
+            </div>
+        </div>
+        
+        <div class="success-overlay" id="successOverlay">
+            <div class="success-content">
+                <div class="success-ring"></div>
+                <div class="success-score" id="successScore">0.0%</div>
+                <div class="success-text" id="successText">New best score!</div>
+                <div class="level-complete" id="levelComplete">Level 1 Complete!</div>
+                <div class="level-actions">
+                    <button class="replay-btn" id="replayBtn">Replay Level</button>
+                    <button class="next-level-btn" id="nextLevelBtn">Next Level</button>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="copy-btn">Copy</button>
+            </div>
+        </div>
+        
+        <div class="confetti-container" id="confettiContainer"></div>
+        <div class="celebration-container" id="celebrationContainer"></div>
+    </div>
+    
+    <script type="module" src="script.js"></script>
+</body>
+</html> 
