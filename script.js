@@ -261,7 +261,9 @@ class CentringDisaster {
     
     onSuccess(score) {
         const currentBest = this.bestScores[this.currentLevel] || 0;
-        if (score > currentBest) {
+        const isNewBest = score > currentBest;
+        
+        if (isNewBest) {
             this.bestScores[this.currentLevel] = score;
             this.saveBestScores();
         }
@@ -270,7 +272,7 @@ class CentringDisaster {
         this.createEpicCelebration();
         
         this.successScore.textContent = score.toFixed(1) + '%';
-        this.successText.textContent = i18n.t('newBestScore');
+        this.successText.textContent = isNewBest ? i18n.t('newBestScore') : i18n.t('notBestScore');
         this.levelComplete.textContent = i18n.t('levelComplete', { level: this.currentLevel });
         
         if (this.currentLevel < this.maxLevel) {
