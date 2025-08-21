@@ -1,5 +1,5 @@
 export default {
-    title: "Centring Disaster - OCD Therapy Tool",
+    title: "Centring Disaster",
     brand: "CENTRING DISASTER",
     dragInstruction: "Drag the object to the center of the screen",
     accuracy: "Accuracy: {score}%",
