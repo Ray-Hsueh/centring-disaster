@@ -34,6 +34,14 @@ class CentringDisaster {
         this.battleLoopId = null;
         this.targetFighterCount = 10;
         
+        this.megaActive = 0;
+        this.lastMegaAt = 0;
+        this.megaCooldown = 5000;
+        this.maxMegaConcurrent = 1;
+        
+        this.lastRebalanceAt = 0;
+        this.rebalanceCooldown = 600;
+        
         this.init();
     }
     
@@ -539,7 +547,7 @@ class CentringDisaster {
     updateBattleLayerForLevel() {
         if (!this.battleLayer) return;
         this.clearBattleLayer();
-        if (this.currentLevel >= 4) {
+        if (this.currentLevel >= 2) { 
             this.startBattle();
         }
     }
@@ -552,6 +560,8 @@ class CentringDisaster {
         this.battleLoopId = null;
         this.fighters = [];
         this.bullets = [];
+        this.megaActive = 0;
+        this.lastRebalanceAt = 0;
         while (this.battleLayer.firstChild) {
             this.battleLayer.removeChild(this.battleLayer.firstChild);
         }
@@ -562,28 +572,37 @@ class CentringDisaster {
         this.spawnToTargetCount();
         this.battleLastTs = performance.now();
         const loop = (ts) => {
-            const dt = Math.min(0.05, (ts - this.battleLastTs) / 1000); // s，限制最大步長
+            const dt = Math.min(0.05, (ts - this.battleLastTs) / 1000);
             this.battleLastTs = ts;
             this.updateFighters(dt);
             this.updateBullets(dt);
+            if (this.currentLevel >= 3) this.updateMegaWeapons(ts, dt);
             this.cullDead();
             this.autoRefill();
+            this.rebalanceTeams(ts);
             this.battleLoopId = requestAnimationFrame(loop);
         };
         this.battleLoopId = requestAnimationFrame(loop);
     }
 
     getTargetFighterCountForLevel(level) {
-        if (level < 4) return 0;
-        const baseAt4 = 10;
-        const count = baseAt4 + (level - 4) * 10;
+        if (level < 2) return 0;
+        const baseAt2 = 6;
+        const count = baseAt2 + (level - 2) * 5; 
         return Math.min(100, count);
     }
 
     spawnToTargetCount() {
         const forbiddenRects = this.getForbiddenRects();
+        if (this.fighters.length === 0 && this.targetFighterCount >= 2) {
+            const posR = this.randomSafeBattlePosition(forbiddenRects);
+            this.createFighter('red', posR.xPercent, posR.yPercent);
+            const posB = this.randomSafeBattlePosition(forbiddenRects);
+            this.createFighter('blue', posB.xPercent, posB.yPercent);
+        }
         while (this.fighters.length < this.targetFighterCount) {
-            const team = Math.random() < 0.5 ? 'red' : 'blue';
+            const counts = this.getTeamCounts();
+            const team = counts.red <= counts.blue ? 'red' : 'blue';
             const pos = this.randomSafeBattlePosition(forbiddenRects);
             this.createFighter(team, pos.xPercent, pos.yPercent);
         }
@@ -593,8 +612,9 @@ class CentringDisaster {
         if (this.fighters.length < this.targetFighterCount) {
             const forbiddenRects = this.getForbiddenRects();
             const need = this.targetFighterCount - this.fighters.length;
+            const counts = this.getTeamCounts();
             for (let i = 0; i < need; i++) {
-                const team = Math.random() < 0.5 ? 'red' : 'blue';
+                const team = counts.red <= counts.blue ? 'red' : 'blue';
                 const pos = this.randomSafeBattlePosition(forbiddenRects);
                 this.createFighter(team, pos.xPercent, pos.yPercent);
             }
@@ -778,6 +798,109 @@ class CentringDisaster {
         while (angle > Math.PI) angle -= Math.PI * 2;
         while (angle < -Math.PI) angle += Math.PI * 2;
         return angle;
+    }
+
+    // ===== Mega Weapons (L3+) =====
+    updateMegaWeapons(ts, dt) {
+        if (this.megaActive >= this.maxMegaConcurrent) return;
+        if (ts - this.lastMegaAt < this.megaCooldown) return;
+        if (Math.random() < 0.2) { 
+            this.lastMegaAt = ts;
+            this.megaActive++;
+            if (Math.random() < 0.6) this.triggerExplosion(); else this.triggerLaser();
+        }
+    }
+
+    triggerExplosion() {
+        const x = Math.random() * window.innerWidth * 0.8 + window.innerWidth * 0.1;
+        const y = Math.random() * window.innerHeight * 0.7 + window.innerHeight * 0.15;
+        const el = document.createElement('div');
+        el.className = 'mega-explosion';
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        this.battleLayer.appendChild(el);
+
+        const radius = 120;
+        for (const f of this.fighters) {
+            const dx = f.x - x, dy = f.y - y;
+            const d2 = dx*dx + dy*dy;
+            if (d2 <= radius*radius) {
+                f.hp -= 2; 
+            }
+        }
+
+        setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); this.megaActive--; }, 550);
+    }
+
+    triggerLaser() {
+        const horizontal = Math.random() < 0.5;
+        const len = horizontal ? window.innerWidth : window.innerHeight;
+        const thickness = 12;
+        const pos = horizontal ? (Math.random() * window.innerHeight * 0.7 + window.innerHeight * 0.15) : (Math.random() * window.innerWidth * 0.8 + window.innerWidth * 0.1);
+        const el = document.createElement('div');
+        el.className = 'laser-beam';
+        if (horizontal) {
+            el.style.left = '0px';
+            el.style.top = pos + 'px';
+            el.style.width = len + 'px';
+            el.style.height = thickness + 'px';
+        } else {
+            el.style.top = '0px';
+            el.style.left = pos + 'px';
+            el.style.height = len + 'px';
+            el.style.width = thickness + 'px';
+        }
+        this.battleLayer.appendChild(el);
+
+        for (const f of this.fighters) {
+            if (horizontal) {
+                if (Math.abs(f.y - pos) < thickness * 0.8) f.hp -= 1;
+            } else {
+                if (Math.abs(f.x - pos) < thickness * 0.8) f.hp -= 1;
+            }
+        }
+
+        setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); this.megaActive--; }, 420);
+    }
+
+    rebalanceTeams(ts) {
+        const { red, blue } = this.getTeamCounts();
+        if (red > 0 && blue > 0) return;
+        if (ts - this.lastRebalanceAt < this.rebalanceCooldown) return;
+        this.lastRebalanceAt = ts;
+        const forbiddenRects = this.getForbiddenRects();
+        const missing = red === 0 ? 'red' : 'blue';
+        const opponents = this.fighters.filter(f => f.team !== missing);
+        const toSpawn = Math.min(5, Math.max(3, Math.floor(this.targetFighterCount * 0.3)));
+        for (let i = 0; i < toSpawn; i++) {
+            const pos = this.randomSafeBattlePositionAwayFrom(forbiddenRects, opponents, 120);
+            this.createFighter(missing, pos.xPercent, pos.yPercent);
+        }
+    }
+
+    randomSafeBattlePositionAwayFrom(forbiddenRects, enemies, minDist) {
+        let tries = 0;
+        while (tries < 200) {
+            const pos = this.randomSafeBattlePosition(forbiddenRects);
+            const x = (pos.xPercent / 100) * window.innerWidth;
+            const y = (pos.yPercent / 100) * window.innerHeight;
+            let ok = true;
+            for (const e of enemies) {
+                const dx = e.x - x, dy = e.y - y;
+                if (dx*dx + dy*dy < minDist*minDist) { ok = false; break; }
+            }
+            if (ok) return pos;
+            tries++;
+        }
+        return this.randomSafeBattlePosition(forbiddenRects);
+    }
+
+    getTeamCounts() {
+        let red = 0, blue = 0;
+        for (const f of this.fighters) {
+            if (f.team === 'red') red++; else if (f.team === 'blue') blue++;
+        }
+        return { red, blue };
     }
 }
 

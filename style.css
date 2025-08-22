@@ -173,6 +173,41 @@ body {
     pointer-events: none;
 }
 
+.mega-explosion {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,240,180,0.95) 0%, rgba(255,120,0,0.8) 40%, rgba(255,0,0,0.0) 60%);
+    filter: blur(1px) drop-shadow(0 0 16px rgba(255,160,0,0.7));
+    animation: explosion-bloom 0.5s ease-out forwards;
+    z-index: 2;
+}
+
+@keyframes explosion-bloom {
+    0% { opacity: 0.9; transform: translate(-50%, -50%) scale(0.4); }
+    70% { opacity: 1; transform: translate(-50%, -50%) scale(2.6); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(3.2); }
+}
+
+.laser-beam {
+    position: absolute;
+    background: linear-gradient(90deg, rgba(255,255,255,0.0) 0%, rgba(255,80,80,0.85) 25%, rgba(255,80,80,0.85) 75%, rgba(255,255,255,0.0) 100%);
+    box-shadow: 0 0 18px rgba(255,80,80,0.8);
+    opacity: 0.85;
+    z-index: 2;
+    animation: beam-flash 0.4s ease-out forwards;
+}
+
+@keyframes beam-flash {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
 .fighter {
     position: absolute;
     width: 14px;
