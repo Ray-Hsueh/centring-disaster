@@ -18,6 +18,7 @@ class CentringDisaster {
         this.brandTextEl = document.querySelector('.brand-text');
         this.scoresTitleEl = document.querySelector('.scores-title');
         this.copyBtnEl = document.querySelector('.copy-btn');
+        this.battleLayer = document.getElementById('battleLayer');
         
         this.isDragging = false;
         this.startX = 0;
@@ -26,6 +27,12 @@ class CentringDisaster {
         this.maxLevel = 8;
         this.bestScores = this.loadBestScores();
         this.levelImages = {};
+        this.activeFightIntervals = [];
+        
+        this.fighters = [];
+        this.bullets = [];
+        this.battleLoopId = null;
+        this.targetFighterCount = 10;
         
         this.init();
     }
@@ -419,6 +426,7 @@ class CentringDisaster {
         this.applyLevelImage();
         this.randomizeObjectPosition();
         this.renderBestScores();
+        this.updateBattleLayerForLevel();
     }
     
     nextLevel() {
@@ -526,6 +534,250 @@ class CentringDisaster {
     
     rectsIntersect(a, b) {
         return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+    }
+
+    updateBattleLayerForLevel() {
+        if (!this.battleLayer) return;
+        this.clearBattleLayer();
+        if (this.currentLevel >= 4) {
+            this.startBattle();
+        }
+    }
+
+    clearBattleLayer() {
+        if (!this.battleLayer) return;
+        this.activeFightIntervals.forEach(id => clearInterval(id));
+        this.activeFightIntervals = [];
+        if (this.battleLoopId) cancelAnimationFrame(this.battleLoopId);
+        this.battleLoopId = null;
+        this.fighters = [];
+        this.bullets = [];
+        while (this.battleLayer.firstChild) {
+            this.battleLayer.removeChild(this.battleLayer.firstChild);
+        }
+    }
+
+    startBattle() {
+        this.targetFighterCount = this.getTargetFighterCountForLevel(this.currentLevel);
+        this.spawnToTargetCount();
+        this.battleLastTs = performance.now();
+        const loop = (ts) => {
+            const dt = Math.min(0.05, (ts - this.battleLastTs) / 1000); // s，限制最大步長
+            this.battleLastTs = ts;
+            this.updateFighters(dt);
+            this.updateBullets(dt);
+            this.cullDead();
+            this.autoRefill();
+            this.battleLoopId = requestAnimationFrame(loop);
+        };
+        this.battleLoopId = requestAnimationFrame(loop);
+    }
+
+    getTargetFighterCountForLevel(level) {
+        if (level < 4) return 0;
+        const baseAt4 = 10;
+        const count = baseAt4 + (level - 4) * 10;
+        return Math.min(100, count);
+    }
+
+    spawnToTargetCount() {
+        const forbiddenRects = this.getForbiddenRects();
+        while (this.fighters.length < this.targetFighterCount) {
+            const team = Math.random() < 0.5 ? 'red' : 'blue';
+            const pos = this.randomSafeBattlePosition(forbiddenRects);
+            this.createFighter(team, pos.xPercent, pos.yPercent);
+        }
+    }
+
+    autoRefill() {
+        if (this.fighters.length < this.targetFighterCount) {
+            const forbiddenRects = this.getForbiddenRects();
+            const need = this.targetFighterCount - this.fighters.length;
+            for (let i = 0; i < need; i++) {
+                const team = Math.random() < 0.5 ? 'red' : 'blue';
+                const pos = this.randomSafeBattlePosition(forbiddenRects);
+                this.createFighter(team, pos.xPercent, pos.yPercent);
+            }
+        }
+    }
+
+    createFighter(team, xPercent, yPercent) {
+        const el = document.createElement('div');
+        el.className = `fighter ${team}`;
+        el.style.left = xPercent + 'vw';
+        el.style.top = yPercent + 'vh';
+        this.battleLayer.appendChild(el);
+
+        const fighter = {
+            id: Math.random().toString(36).slice(2),
+            team,
+            el,
+            x: (xPercent / 100) * window.innerWidth,
+            y: (yPercent / 100) * window.innerHeight,
+            angle: Math.random() * Math.PI * 2,
+            speed: 40 + Math.random() * 30, // px/s
+            hp: 3,
+            shootCooldown: Math.random() * 0.6,
+            targetId: null
+        };
+        this.fighters.push(fighter);
+        return fighter;
+    }
+
+    updateFighters(dt) {
+        const redEnemies = this.fighters.filter(f => f.team === 'blue');
+        const blueEnemies = this.fighters.filter(f => f.team === 'red');
+
+        for (const f of this.fighters) {
+            const enemies = f.team === 'red' ? redEnemies : blueEnemies;
+            if (enemies.length === 0) continue;
+            let target = null, dmin = Infinity;
+            for (const e of enemies) {
+                const dx = e.x - f.x; const dy = e.y - f.y; const d2 = dx*dx + dy*dy;
+                if (d2 < dmin) { dmin = d2; target = e; }
+            }
+            if (!target) continue;
+            f.targetId = target.id;
+
+            const desiredAngle = Math.atan2(target.y - f.y, target.x - f.x);
+            const angleDelta = this.normalizeAngle(desiredAngle - f.angle);
+            f.angle += Math.max(-3*dt, Math.min(3*dt, angleDelta));
+
+            const dist = Math.sqrt(dmin);
+            const preferred = 120;
+            let move = 0;
+            if (dist > preferred) move = 1;
+            else if (dist < preferred * 0.7) move = -0.5;
+            const nx = Math.cos(f.angle), ny = Math.sin(f.angle);
+            f.x += nx * f.speed * move * dt;
+            f.y += ny * f.speed * move * dt;
+
+            f.x = Math.max(20, Math.min(window.innerWidth - 20, f.x));
+            f.y = Math.max(20, Math.min(window.innerHeight - 20, f.y));
+
+            f.shootCooldown -= dt;
+            if (f.shootCooldown <= 0 && dist < 420) {
+                this.fireBullet(f);
+                f.shootCooldown = 0.4 + Math.random() * 0.6;
+            }
+
+            elSetTransform(f.el, f.x, f.y, f.angle);
+        }
+
+        function elSetTransform(el, x, y, angle) {
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+        }
+    }
+
+    fireBullet(fighter) {
+        const speed = 360; // px/s
+        const life = 1.6; // s
+        const bx = fighter.x + Math.cos(fighter.angle) * 10;
+        const by = fighter.y + Math.sin(fighter.angle) * 10;
+        const el = document.createElement('div');
+        el.className = 'bullet';
+        el.style.left = bx + 'px';
+        el.style.top = by + 'px';
+        el.style.transform = `translate(-50%, -50%) rotate(${fighter.angle}rad)`;
+        this.battleLayer.appendChild(el);
+        this.bullets.push({
+            el,
+            x: bx,
+            y: by,
+            vx: Math.cos(fighter.angle) * speed,
+            vy: Math.sin(fighter.angle) * speed,
+            team: fighter.team,
+            ttl: life
+        });
+    }
+
+    updateBullets(dt) {
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            const b = this.bullets[i];
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            b.ttl -= dt;
+            b.el.style.left = b.x + 'px';
+            b.el.style.top = b.y + 'px';
+
+            if (b.ttl <= 0 || b.x < -20 || b.y < -20 || b.x > window.innerWidth + 20 || b.y > window.innerHeight + 20) {
+                this.removeBulletAt(i);
+                continue;
+            }
+
+            const targets = this.fighters.filter(f => f.team !== b.team);
+            let hitIndex = -1;
+            for (let fi = 0; fi < this.fighters.length; fi++) {
+                const f = this.fighters[fi];
+                if (f.team === b.team) continue;
+                const dx = f.x - b.x, dy = f.y - b.y;
+                if (dx*dx + dy*dy <= 12*12) { hitIndex = fi; break; }
+            }
+            if (hitIndex >= 0) {
+                const f = this.fighters[hitIndex];
+                f.hp -= 1;
+                this.spawnHitSpark(f.x, f.y);
+                this.removeBulletAt(i);
+            }
+        }
+    }
+
+    removeBulletAt(i) {
+        const b = this.bullets[i];
+        if (b && b.el && b.el.parentNode) b.el.parentNode.removeChild(b.el);
+        this.bullets.splice(i, 1);
+    }
+
+    spawnHitSpark(x, y) {
+        const spark = document.createElement('div');
+        spark.className = 'hit-spark';
+        spark.style.left = x + 'px';
+        spark.style.top = y + 'px';
+        this.battleLayer.appendChild(spark);
+        setTimeout(() => { if (spark.parentNode) spark.parentNode.removeChild(spark); }, 250);
+    }
+
+    cullDead() {
+        for (let i = this.fighters.length - 1; i >= 0; i--) {
+            const f = this.fighters[i];
+            if (f.hp <= 0) {
+                f.el.classList.add('dead');
+                const el = f.el;
+                setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+                this.fighters.splice(i, 1);
+            }
+        }
+    }
+
+    spawnFighters() { }
+
+    randomSafeBattlePosition(forbiddenRects) {
+        const marginVw = 6;
+        const marginVhTop = 18;
+        const marginVhBottom = 12;
+        let x = 50, y = 50, attempts = 0;
+        do {
+            x = Math.random() * (100 - marginVw * 2) + marginVw;
+            y = Math.random() * (100 - marginVhTop - marginVhBottom) + marginVhTop;
+            attempts++;
+        } while (this.positionOverlapsUi(x, y, forbiddenRects) && attempts < 200);
+        return { xPercent: x, yPercent: y };
+    }
+
+    positionOverlapsUi(xPercent, yPercent, rects) {
+        const x = (xPercent / 100) * window.innerWidth;
+        const y = (yPercent / 100) * window.innerHeight;
+        const size = 28;
+        const obj = { left: x - size, top: y - size, right: x + size, bottom: y + size };
+        return rects.some(r => this.rectsIntersect(obj, r));
+    }
+
+    normalizeAngle(angle) {
+        while (angle > Math.PI) angle -= Math.PI * 2;
+        while (angle < -Math.PI) angle += Math.PI * 2;
+        return angle;
     }
 }
 
