@@ -631,3 +631,103 @@ body {
         gap: 15px;
     }
 } 
+
+.zollner-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background: #000;
+    overflow: hidden;
+}
+
+.zollner-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        repeating-linear-gradient(
+            45deg,
+            transparent 0px,
+            transparent 25px,
+            #333 25px,
+            #333 28px
+        ),
+        repeating-linear-gradient(
+            -45deg,
+            transparent 0px,
+            transparent 25px,
+            #333 25px,
+            #333 28px
+        );
+    background-size: 50px 50px, 50px 50px;
+    background-position: 0 0, 25px 25px;
+    opacity: 0.25;
+    animation: zollner-move 30s linear infinite;
+}
+
+.zollner-bg::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        repeating-linear-gradient(
+            30deg,
+            transparent 0px,
+            transparent 20px,
+            #444 20px,
+            #444 23px
+        ),
+        repeating-linear-gradient(
+            -30deg,
+            transparent 0px,
+            transparent 20px,
+            #444 20px,
+            #444 23px
+        );
+    background-size: 40px 40px, 40px 40px;
+    background-position: 20px 20px, 0 0;
+    opacity: 0.15;
+    animation: zollner-move 25s linear infinite reverse;
+}
+
+@keyframes zollner-move {
+    0% {
+        transform: translate(0, 0);
+    }
+    100% {
+        transform: translate(30px, 30px);
+    }
+}
+
+.zollner-bg.level-5::before,
+.zollner-bg.level-5::after {
+    background-size: 45px 45px, 45px 45px;
+    animation-duration: 25s, 35s;
+}
+
+.zollner-bg.level-6::before,
+.zollner-bg.level-6::after {
+    background-size: 40px 40px, 40px 40px;
+    animation-duration: 20s, 30s;
+}
+
+.zollner-bg.level-7::before,
+.zollner-bg.level-7::after {
+    background-size: 35px 35px, 35px 35px;
+    animation-duration: 18s, 25s;
+}
+
+.zollner-bg.level-8::before,
+.zollner-bg.level-8::after {
+    background-size: 30px 30px, 30px 30px;
+    animation-duration: 15s, 22s;
+} 

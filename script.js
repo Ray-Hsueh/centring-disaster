@@ -442,6 +442,7 @@ class CentringDisaster {
         this.randomizeObjectPosition();
         this.renderBestScores();
         this.updateBattleLayerForLevel();
+        this.applyZollnerBackground();
     }
     
     nextLevel() {
@@ -908,6 +909,19 @@ class CentringDisaster {
             if (f.team === 'red') red++; else if (f.team === 'blue') blue++;
         }
         return { red, blue };
+    }
+
+    applyZollnerBackground() {
+        const existingBg = document.querySelector('.zollner-bg');
+        if (existingBg) {
+            existingBg.remove();
+        }
+
+        if (this.currentLevel >= 4) {
+            const zollnerBg = document.createElement('div');
+            zollnerBg.className = `zollner-bg level-${this.currentLevel}`;
+            document.body.appendChild(zollnerBg);
+        }
     }
 }
 
