@@ -4,6 +4,9 @@ class CentringDisaster {
     constructor() {
         this.draggableObject = document.getElementById('draggableObject');
         this.scoreDisplay = document.getElementById('scoreDisplay');
+        this.flipCard = this.scoreDisplay.querySelector('.flip-card');
+        this.flipCardFront = this.scoreDisplay.querySelector('.flip-card-front .score-text');
+        this.flipCardBack = this.scoreDisplay.querySelector('.flip-card-back .score-text');
         this.successOverlay = document.getElementById('successOverlay');
         this.successScore = document.getElementById('successScore');
         this.successText = document.getElementById('successText');
@@ -129,6 +132,8 @@ class CentringDisaster {
         document.querySelector('.copy-btn').addEventListener('click', this.copyScore.bind(this));
         this.nextLevelBtn.addEventListener('click', this.nextLevel.bind(this));
         this.replayBtn.addEventListener('click', this.replayLevel.bind(this));
+        
+        this.scoreDisplay.addEventListener('click', this.toggleFlipCard.bind(this));
         
         this.successOverlay.addEventListener('click', (e) => {
             if (e.target === this.successOverlay) {
@@ -373,12 +378,14 @@ class CentringDisaster {
     
     updateScoreDisplay(score = null) {
         if (score !== null) {
-            this.scoreDisplay.querySelector('.score-text').textContent = 
-                i18n.t('accuracy', { score: score.toFixed(1) });
+            this.flipCardBack.textContent = i18n.t('accuracy', { score: score.toFixed(1) });
         } else {
-            this.scoreDisplay.querySelector('.score-text').textContent = 
-                i18n.t('dragInstruction');
+            this.flipCardBack.textContent = i18n.t('dragInstruction');
         }
+    }
+    
+    toggleFlipCard() {
+        this.flipCard.classList.toggle('flipped');
     }
     
     renderBestScores() {
