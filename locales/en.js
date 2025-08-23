@@ -1,7 +1,7 @@
 export default {
     title: "Centring Disaster",
     brand: "CENTRING DISASTER",
-    dragInstruction: "Drag the object to the center of the screen",
+    dragInstruction: "Why play games with numbers?",
     accuracy: "Accuracy: {score}%",
     newBestScore: "New best score!",
     notBestScore: "Nice try, but that's not even close to your best lol",
